@@ -1,341 +1,223 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Container,
-  Paper,
-  TextField,
-  Button,
-  Typography,
-  Box,
-  Alert,
-  CircularProgress,
-  Radio,
-  RadioGroup,
-  FormControlLabel,
-  FormControl,
-  FormLabel,
-  IconButton,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
+  Container, Paper, TextField, Button, Typography, Box,
+  Radio, RadioGroup, FormControlLabel, FormControl, FormLabel,
+  IconButton, List, ListItem, ListItemText, ListItemSecondaryAction,
+  Stepper, Step, StepLabel, CircularProgress, Divider
 } from '@mui/material';
 import {
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  ArrowUpward as ArrowUpIcon,
-  ArrowDownward as ArrowDownIcon,
+  Add as AddIcon, Delete as DeleteIcon,
+  ArrowUpward as ArrowUpIcon, ArrowDownward as ArrowDownIcon,
+  AutoAwesome as SparkleIcon
 } from '@mui/icons-material';
-import AppBar from '@mui/material/AppBar';
-import Toolbar from '@mui/material/Toolbar';
-import { useAuth } from '../contexts/AuthContext';
+import { useSnackbar } from '../contexts/SnackbarContext';
 import api from '../config/api';
 
+const steps = ['Project Details', 'Topic & Structure', 'Review & Create'];
+
 function NewProject() {
+  const [activeStep, setActiveStep] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [generatingTemplate, setGeneratingTemplate] = useState(false);
+  
+  // Form Data
   const [name, setName] = useState('');
   const [documentType, setDocumentType] = useState('docx');
   const [topic, setTopic] = useState('');
-  const [outline, setOutline] = useState([]);
-  const [slides, setSlides] = useState([]);
-  const [newSectionTitle, setNewSectionTitle] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [generatingTemplate, setGeneratingTemplate] = useState(false);
-  const { currentUser } = useAuth();
+  const [items, setItems] = useState([]); // Shared state for Outline or Slides
+  const [newItemTitle, setNewItemTitle] = useState('');
+
   const navigate = useNavigate();
+  const { showSnackbar } = useSnackbar();
 
   const handleAddSection = () => {
-    if (!newSectionTitle.trim()) return;
-
-    const newItem = {
-      id: `item_${Date.now()}`,
-      title: newSectionTitle.trim(),
-      order: documentType === 'docx' ? outline.length : slides.length,
-    };
-
-    if (documentType === 'docx') {
-      setOutline([...outline, newItem]);
-    } else {
-      setSlides([...slides, newItem]);
-    }
-
-    setNewSectionTitle('');
+    if (!newItemTitle.trim()) return;
+    setItems([...items, {
+      id: `temp_${Date.now()}`,
+      title: newItemTitle.trim(),
+      order: items.length
+    }]);
+    setNewItemTitle('');
   };
 
-  const handleDeleteItem = (id) => {
-    if (documentType === 'docx') {
-      const updated = outline.filter((item) => item.id !== id);
-      setOutline(updated.map((item, index) => ({ ...item, order: index })));
-    } else {
-      const updated = slides.filter((item) => item.id !== id);
-      setSlides(updated.map((item, index) => ({ ...item, order: index })));
-    }
+  const handleDeleteItem = (indexToDelete) => {
+    const updated = items.filter((_, idx) => idx !== indexToDelete);
+    setItems(updated.map((item, idx) => ({ ...item, order: idx })));
   };
 
-  const handleMoveItem = (id, direction) => {
-    if (documentType === 'docx') {
-      const index = outline.findIndex((item) => item.id === id);
-      if (
-        (direction === 'up' && index === 0) ||
-        (direction === 'down' && index === outline.length - 1)
-      ) {
-        return;
-      }
-      const newIndex = direction === 'up' ? index - 1 : index + 1;
-      const updated = [...outline];
-      [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
-      setOutline(updated.map((item, i) => ({ ...item, order: i })));
-    } else {
-      const index = slides.findIndex((item) => item.id === id);
-      if (
-        (direction === 'up' && index === 0) ||
-        (direction === 'down' && index === slides.length - 1)
-      ) {
-        return;
-      }
-      const newIndex = direction === 'up' ? index - 1 : index + 1;
-      const updated = [...slides];
-      [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
-      setSlides(updated.map((item, i) => ({ ...item, order: i })));
-    }
+  const handleMoveItem = (index, direction) => {
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === items.length - 1)) return;
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    const updated = [...items];
+    [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
+    setItems(updated.map((item, idx) => ({ ...item, order: idx })));
   };
 
   const handleGenerateTemplate = async () => {
     if (!topic.trim()) {
-      setError('Please enter a topic first');
+      showSnackbar('Please enter a topic first', 'warning');
       return;
     }
-
     try {
       setGeneratingTemplate(true);
-      setError('');
+      // Create temp project just to hit the endpoint
+      const tempProject = { name: 'temp', document_type: documentType, topic: topic };
+      const projRes = await api.post('/api/projects/', tempProject);
+      const projectId = projRes.data.id;
       
-      // Create a temporary project to generate template
-      const tempProject = {
-        name: 'temp',
-        document_type: documentType,
-        topic: topic,
-      };
-      
-      const projectResponse = await api.post('/api/projects/', tempProject);
-      const projectId = projectResponse.data.id;
-      
-      const templateResponse = await api.post(`/api/documents/${projectId}/generate-template`);
-      const template = templateResponse.data.template;
-      
-      // Delete temp project
-      await api.delete(`/api/projects/${projectId}`);
-      
-      if (documentType === 'docx') {
-        setOutline(template.map((item, index) => ({ ...item, id: `item_${Date.now()}_${index}`, order: index })));
-      } else {
-        setSlides(template.map((item, index) => ({ ...item, id: `item_${Date.now()}_${index}`, order: index })));
-      }
+      const templateRes = await api.post(`/api/documents/${projectId}/generate-template`);
+      // Cleanup temp project
+      api.delete(`/api/projects/${projectId}`); // Fire and forget cleanup
+
+      const template = templateRes.data.template;
+      setItems(template.map((t, i) => ({ id: `ai_${i}`, title: t.title, order: i })));
+      showSnackbar('Template generated successfully!');
     } catch (err) {
-      setError('Failed to generate template: ' + (err.response?.data?.detail || err.message));
+      showSnackbar('Failed to generate template', 'error');
     } finally {
       setGeneratingTemplate(false);
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!name.trim() || !topic.trim()) {
-      setError('Please fill in all required fields');
-      return;
-    }
-
-    if (documentType === 'docx' && outline.length === 0) {
-      setError('Please add at least one section to the outline');
-      return;
-    }
-
-    if (documentType === 'pptx' && slides.length === 0) {
-      setError('Please add at least one slide');
-      return;
-    }
+  const handleCreateProject = async () => {
+    if (!name.trim()) return showSnackbar('Project name is required', 'error');
+    if (items.length === 0) return showSnackbar(`Please add at least one ${documentType === 'docx' ? 'section' : 'slide'}`, 'error');
 
     try {
       setLoading(true);
-      setError('');
-
       const projectData = {
         name: name.trim(),
         document_type: documentType,
         topic: topic.trim(),
-        outline: documentType === 'docx' ? outline : undefined,
-        slides: documentType === 'pptx' ? slides : undefined,
+        outline: documentType === 'docx' ? items : undefined,
+        slides: documentType === 'pptx' ? items : undefined,
       };
-
       const response = await api.post('/api/projects/', projectData);
+      showSnackbar('Project created successfully!');
       navigate(`/project/${response.data.id}`);
     } catch (err) {
-      setError('Failed to create project: ' + (err.response?.data?.detail || err.message));
+      showSnackbar('Failed to create project', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const items = documentType === 'docx' ? outline : slides;
+  const handleNext = () => {
+    if (activeStep === 0 && !name.trim()) return showSnackbar('Please enter a project name', 'warning');
+    if (activeStep === 1 && !topic.trim()) return showSnackbar('Please enter a topic', 'warning');
+    setActiveStep((prev) => prev + 1);
+  };
 
-  return (
-    <>
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            New Project
-          </Typography>
-          <Button color="inherit" onClick={() => navigate('/dashboard')}>
-            Cancel
-          </Button>
-        </Toolbar>
-      </AppBar>
-      <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-        <Paper elevation={3} sx={{ padding: 4 }}>
-          <Typography variant="h5" component="h1" gutterBottom>
-            Create New Project
-          </Typography>
+  const handleBack = () => setActiveStep((prev) => prev - 1);
 
-          {error && (
-            <Alert severity="error" sx={{ mt: 2 }} onClose={() => setError('')}>
-              {error}
-            </Alert>
-          )}
-
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
+  // Render Step Content
+  const renderStepContent = (step) => {
+    switch (step) {
+      case 0:
+        return (
+          <Box sx={{ mt: 2 }}>
             <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="name"
-              label="Project Name"
-              name="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              fullWidth label="Project Name" value={name} onChange={(e) => setName(e.target.value)}
+              margin="normal" autoFocus required placeholder="My Awesome Project"
             />
-
-            <FormControl component="fieldset" sx={{ mt: 2, mb: 2 }}>
+            <FormControl component="fieldset" sx={{ mt: 3, width: '100%' }}>
               <FormLabel component="legend">Document Type</FormLabel>
-              <RadioGroup
-                row
-                value={documentType}
-                onChange={(e) => {
-                  setDocumentType(e.target.value);
-                  setOutline([]);
-                  setSlides([]);
-                }}
-              >
-                <FormControlLabel value="docx" control={<Radio />} label="Word Document (.docx)" />
-                <FormControlLabel value="pptx" control={<Radio />} label="PowerPoint (.pptx)" />
+              <RadioGroup row value={documentType} onChange={(e) => { setDocumentType(e.target.value); setItems([]); }}>
+                <Paper variant="outlined" sx={{ p: 2, mr: 2, display: 'flex', alignItems: 'center', cursor: 'pointer', borderColor: documentType === 'docx' ? 'primary.main' : 'divider' }}>
+                  <FormControlLabel value="docx" control={<Radio />} label="Word Document (.docx)" />
+                </Paper>
+                <Paper variant="outlined" sx={{ p: 2, display: 'flex', alignItems: 'center', cursor: 'pointer', borderColor: documentType === 'pptx' ? 'primary.main' : 'divider' }}>
+                  <FormControlLabel value="pptx" control={<Radio />} label="PowerPoint (.pptx)" />
+                </Paper>
               </RadioGroup>
             </FormControl>
-
+          </Box>
+        );
+      case 1:
+        return (
+          <Box sx={{ mt: 2 }}>
             <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="topic"
-              label="Main Topic"
-              name="topic"
-              placeholder="e.g., A market analysis of the EV industry in 2025"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
+              fullWidth label="Main Topic" value={topic} onChange={(e) => setTopic(e.target.value)}
+              margin="normal" placeholder="e.g. Market Analysis of Electric Vehicles" multiline rows={2}
             />
-
-            <Box sx={{ mt: 3, mb: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">
-                  {documentType === 'docx' ? 'Document Outline' : 'Slides'}
-                </Typography>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={handleGenerateTemplate}
-                  disabled={generatingTemplate || !topic.trim()}
-                >
-                  {generatingTemplate ? <CircularProgress size={20} /> : 'AI-Suggest Template'}
-                </Button>
-              </Box>
-
-              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder={`Enter ${documentType === 'docx' ? 'section title' : 'slide title'}`}
-                  value={newSectionTitle}
-                  onChange={(e) => setNewSectionTitle(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddSection();
-                    }
-                  }}
-                />
-                <Button variant="contained" onClick={handleAddSection} startIcon={<AddIcon />}>
-                  Add
-                </Button>
-              </Box>
-
-              <List>
-                {items.map((item, index) => (
-                  <ListItem key={item.id}>
-                    <ListItemText
-                      primary={`${index + 1}. ${item.title}`}
-                    />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 4, mb: 2 }}>
+              <Typography variant="h6">{documentType === 'docx' ? 'Outline Structure' : 'Presentation Slides'}</Typography>
+              <Button
+                variant="contained" color="secondary" size="small"
+                startIcon={generatingTemplate ? <CircularProgress size={16} color="inherit" /> : <SparkleIcon />}
+                onClick={handleGenerateTemplate} disabled={generatingTemplate || !topic.trim()}
+              >
+                AI Suggest Structure
+              </Button>
+            </Box>
+            <Divider sx={{ mb: 2 }} />
+            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+              <TextField
+                fullWidth size="small" placeholder={`New ${documentType === 'docx' ? 'section' : 'slide'} title`}
+                value={newItemTitle} onChange={(e) => setNewItemTitle(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddSection()}
+              />
+              <Button variant="contained" onClick={handleAddSection} startIcon={<AddIcon />}>Add</Button>
+            </Box>
+            <Paper variant="outlined" sx={{ maxHeight: 300, overflow: 'auto' }}>
+              <List dense>
+                {items.length === 0 ? (
+                  <ListItem><ListItemText primary="No items yet. Add manually or use AI." sx={{ color: 'text.secondary', textAlign: 'center' }} /></ListItem>
+                ) : items.map((item, index) => (
+                  <ListItem key={index} divider={index !== items.length - 1}>
+                    <ListItemText primary={`${index + 1}. ${item.title}`} />
                     <ListItemSecondaryAction>
-                      <IconButton
-                        edge="end"
-                        onClick={() => handleMoveItem(item.id, 'up')}
-                        disabled={index === 0}
-                        size="small"
-                      >
-                        <ArrowUpIcon />
-                      </IconButton>
-                      <IconButton
-                        edge="end"
-                        onClick={() => handleMoveItem(item.id, 'down')}
-                        disabled={index === items.length - 1}
-                        size="small"
-                      >
-                        <ArrowDownIcon />
-                      </IconButton>
-                      <IconButton
-                        edge="end"
-                        onClick={() => handleDeleteItem(item.id)}
-                        color="error"
-                        size="small"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
+                      <IconButton size="small" onClick={() => handleMoveItem(index, 'up')} disabled={index === 0}><ArrowUpIcon fontSize="small" /></IconButton>
+                      <IconButton size="small" onClick={() => handleMoveItem(index, 'down')} disabled={index === items.length - 1}><ArrowDownIcon fontSize="small" /></IconButton>
+                      <IconButton size="small" color="error" onClick={() => handleDeleteItem(index)}><DeleteIcon fontSize="small" /></IconButton>
                     </ListItemSecondaryAction>
                   </ListItem>
                 ))}
               </List>
-            </Box>
-
-            <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-              <Button
-                variant="outlined"
-                onClick={() => navigate('/dashboard')}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={loading}
-              >
-                {loading ? <CircularProgress size={24} /> : 'Create Project'}
+            </Paper>
+          </Box>
+        );
+      case 2:
+        return (
+          <Box sx={{ mt: 2, textAlign: 'center' }}>
+            <Typography variant="h5" gutterBottom>Ready to Create?</Typography>
+            <Typography color="text.secondary" paragraph>
+              You are creating a <strong>{documentType.toUpperCase()}</strong> about <strong>"{topic}"</strong> with <strong>{items.length}</strong> {documentType === 'docx' ? 'sections' : 'slides'}.
+            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+              <Button size="large" variant="contained" onClick={handleCreateProject} disabled={loading} sx={{ minWidth: 200 }}>
+                {loading ? <CircularProgress size={24} color="inherit" /> : 'Create Project'}
               </Button>
             </Box>
           </Box>
+        );
+      default: return 'Unknown step';
+    }
+  };
+
+  return (
+    <Box sx={{ minHeight: '100vh', bgcolor: '#f3f4f6', py: 4 }}>
+      <Container maxWidth="md">
+        <Button onClick={() => navigate('/dashboard')} sx={{ mb: 2 }}>Back to Dashboard</Button>
+        <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
+          <Typography variant="h4" align="center" gutterBottom sx={{ fontWeight: 700, color: 'primary.main' }}>New Project</Typography>
+          <Stepper activeStep={activeStep} sx={{ py: 3 }}>
+            {steps.map((label) => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}
+          </Stepper>
+          <Box sx={{ minHeight: 400 }}>
+            {renderStepContent(activeStep)}
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+            <Button disabled={activeStep === 0} onClick={handleBack}>Back</Button>
+            {activeStep < steps.length - 1 && (
+              <Button variant="contained" onClick={handleNext}>Next</Button>
+            )}
+          </Box>
         </Paper>
       </Container>
-    </>
+    </Box>
   );
 }
 
 export default NewProject;
-

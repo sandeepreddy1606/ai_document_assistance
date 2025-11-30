@@ -1,46 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Container,
-  Paper,
-  Typography,
-  Button,
-  Box,
-  TextField,
-  Alert,
-  CircularProgress,
-  AppBar,
-  Toolbar,
-  IconButton,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  Container, Paper, Typography, Button, Box, TextField,
+  CircularProgress, AppBar, Toolbar, IconButton, Accordion,
+  AccordionSummary, AccordionDetails, ToggleButton, ToggleButtonGroup,
+  Fab, Dialog, DialogTitle, DialogContent, DialogActions, Tooltip, Fade
 } from '@mui/material';
 import {
-  ArrowBack as ArrowBackIcon,
-  Download as DownloadIcon,
-  ExpandMore as ExpandMoreIcon,
-  ThumbUp as ThumbUpIcon,
-  ThumbDown as ThumbDownIcon,
-  Comment as CommentIcon,
-  Refresh as RefreshIcon,
+  ArrowBack as ArrowBackIcon, Download as DownloadIcon,
+  ExpandMore as ExpandMoreIcon, ThumbUp as ThumbUpIcon,
+  ThumbDown as ThumbDownIcon, Comment as CommentIcon,
+  Refresh as RefreshIcon, Edit as EditIcon, Visibility as ViewIcon,
+  NavigateNext as NextIcon, NavigateBefore as PrevIcon,
+  AutoFixHigh as MagicIcon
 } from '@mui/icons-material';
 import api from '../config/api';
+import { useSnackbar } from '../contexts/SnackbarContext';
 
 function ProjectDetail() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const { showSnackbar } = useSnackbar();
+
+  // State
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [refining, setRefining] = useState({});
   const [exporting, setExporting] = useState(false);
-  const [error, setError] = useState('');
+  
+  // UI State
+  const [viewMode, setViewMode] = useState('editor'); // 'editor' or 'preview'
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  
+  // Data State
   const [refinementPrompts, setRefinementPrompts] = useState({});
   const [comments, setComments] = useState({});
   const [commentDialog, setCommentDialog] = useState({ open: false, sectionId: null });
@@ -51,22 +44,15 @@ function ProjectDetail() {
 
   async function fetchProject() {
     try {
-      setLoading(true);
       const response = await api.get(`/api/projects/${projectId}`);
       setProject(response.data);
-      
-      // Initialize refinement prompts and comments
+      // Initialize prompts
       const content = response.data.content || {};
       const prompts = {};
-      const comms = {};
-      Object.keys(content).forEach((key) => {
-        prompts[key] = '';
-        comms[key] = '';
-      });
-      setRefinementPrompts(prompts);
-      setComments(comms);
+      Object.keys(content).forEach((key) => prompts[key] = '');
+      setRefinementPrompts(prev => ({...prev, ...prompts}));
     } catch (err) {
-      setError('Failed to load project: ' + (err.response?.data?.detail || err.message));
+      showSnackbar('Failed to load project', 'error');
     } finally {
       setLoading(false);
     }
@@ -75,11 +61,12 @@ function ProjectDetail() {
   async function handleGenerateContent() {
     try {
       setGenerating(true);
-      setError('');
       await api.post(`/api/documents/${projectId}/generate-content`);
       await fetchProject();
+      setViewMode('preview'); // Auto-switch to preview to see results
+      showSnackbar('Content generated successfully!');
     } catch (err) {
-      setError('Failed to generate content: ' + (err.response?.data?.detail || err.message));
+      showSnackbar('Failed to generate content', 'error');
     } finally {
       setGenerating(false);
     }
@@ -87,66 +74,33 @@ function ProjectDetail() {
 
   async function handleRefine(sectionId) {
     const prompt = refinementPrompts[sectionId];
-    if (!prompt || !prompt.trim()) {
-      setError('Please enter a refinement prompt');
-      return;
-    }
+    if (!prompt?.trim()) return showSnackbar('Enter a prompt first', 'warning');
 
     try {
-      setRefining({ ...refining, [sectionId]: true });
-      setError('');
-      await api.post(`/api/documents/${projectId}/refine`, {
-        section_id: sectionId,
-        prompt: prompt,
-      });
-      setRefinementPrompts({ ...refinementPrompts, [sectionId]: '' });
+      setRefining(prev => ({ ...prev, [sectionId]: true }));
+      await api.post(`/api/documents/${projectId}/refine`, { section_id: sectionId, prompt });
+      setRefinementPrompts(prev => ({ ...prev, [sectionId]: '' }));
       await fetchProject();
+      showSnackbar('Section refined!');
     } catch (err) {
-      setError('Failed to refine content: ' + (err.response?.data?.detail || err.message));
+      showSnackbar('Refinement failed', 'error');
     } finally {
-      setRefining({ ...refining, [sectionId]: false });
+      setRefining(prev => ({ ...prev, [sectionId]: false }));
     }
   }
 
-  async function handleFeedback(sectionId, feedbackType) {
+  async function handleFeedback(sectionId, type) {
     try {
-      await api.post(`/api/documents/${projectId}/feedback`, {
-        section_id: sectionId,
-        feedback_type: feedbackType,
-      });
-      await fetchProject();
-    } catch (err) {
-      setError('Failed to add feedback: ' + (err.response?.data?.detail || err.message));
-    }
-  }
-
-  async function handleAddComment(sectionId) {
-    const comment = comments[sectionId];
-    if (!comment || !comment.trim()) {
-      return;
-    }
-
-    try {
-      await api.post(`/api/documents/${projectId}/comment`, {
-        section_id: sectionId,
-        comment: comment,
-      });
-      setComments({ ...comments, [sectionId]: '' });
-      setCommentDialog({ open: false, sectionId: null });
-      await fetchProject();
-    } catch (err) {
-      setError('Failed to add comment: ' + (err.response?.data?.detail || err.message));
-    }
+      await api.post(`/api/documents/${projectId}/feedback`, { section_id: sectionId, feedback_type: type });
+      // Ideally update local state optimistically, but re-fetching for now
+      fetchProject(); 
+    } catch (e) { console.error(e); }
   }
 
   async function handleExport() {
     try {
       setExporting(true);
-      setError('');
-      const response = await api.get(`/api/documents/${projectId}/export`, {
-        responseType: 'blob',
-      });
-      
+      const response = await api.get(`/api/documents/${projectId}/export`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -154,28 +108,16 @@ function ProjectDetail() {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      showSnackbar('Download started!');
     } catch (err) {
-      setError('Failed to export document: ' + (err.response?.data?.detail || err.message));
+      showSnackbar('Export failed', 'error');
     } finally {
       setExporting(false);
     }
   }
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (!project) {
-    return (
-      <Container>
-        <Alert severity="error">Project not found</Alert>
-      </Container>
-    );
-  }
+  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', height: '100vh', alignItems: 'center' }}><CircularProgress /></Box>;
+  if (!project) return <Container sx={{ mt: 4 }}><Typography color="error">Project not found</Typography></Container>;
 
   const content = project.content || {};
   const hasContent = Object.keys(content).length > 0;
@@ -183,212 +125,223 @@ function ProjectDetail() {
   const sortedItems = [...(items || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
 
   return (
-    <>
-      <AppBar position="static">
+    <Box sx={{ bgcolor: '#f3f4f6', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Top Bar */}
+      <AppBar position="sticky" color="default" elevation={1} sx={{ bgcolor: 'white' }}>
         <Toolbar>
-          <IconButton edge="start" color="inherit" onClick={() => navigate('/dashboard')} sx={{ mr: 2 }}>
+          <IconButton edge="start" onClick={() => navigate('/dashboard')} sx={{ mr: 2 }}>
             <ArrowBackIcon />
           </IconButton>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 'bold', color: '#111827' }}>
             {project.name}
           </Typography>
+          
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={(e, newView) => newView && setViewMode(newView)}
+            aria-label="view mode"
+            size="small"
+            sx={{ mr: 2 }}
+          >
+            <ToggleButton value="editor" aria-label="editor">
+              <EditIcon sx={{ mr: 1 }} fontSize="small" /> Editor
+            </ToggleButton>
+            <ToggleButton value="preview" aria-label="preview">
+              <ViewIcon sx={{ mr: 1 }} fontSize="small" /> Preview
+            </ToggleButton>
+          </ToggleButtonGroup>
+
           <Button
-            color="inherit"
-            startIcon={<DownloadIcon />}
+            variant="contained"
+            color="primary"
+            startIcon={exporting ? <CircularProgress size={20} color="inherit" /> : <DownloadIcon />}
             onClick={handleExport}
             disabled={exporting || !hasContent}
           >
-            {exporting ? <CircularProgress size={20} color="inherit" /> : 'Export'}
+            Download
           </Button>
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Paper elevation={3} sx={{ padding: 4 }}>
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="h4" component="h1" gutterBottom>
-              {project.name}
-            </Typography>
-            <Typography variant="body1" color="text.secondary" gutterBottom>
-              <strong>Type:</strong> {project.document_type.toUpperCase()}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              <strong>Topic:</strong> {project.topic}
-            </Typography>
-          </Box>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-              {error}
-            </Alert>
-          )}
-
-          {!hasContent ? (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Typography variant="h6" gutterBottom>
-                No content generated yet
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Click the button below to generate content for all {project.document_type === 'docx' ? 'sections' : 'slides'}
-              </Typography>
-              <Button
-                variant="contained"
-                size="large"
-                onClick={handleGenerateContent}
-                disabled={generating}
-                startIcon={generating ? <CircularProgress size={20} /> : <RefreshIcon />}
-              >
-                {generating ? 'Generating...' : 'Generate Content'}
-              </Button>
-            </Box>
-          ) : (
-            <>
-              <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
-                <Button
-                  variant="outlined"
-                  onClick={handleGenerateContent}
-                  disabled={generating}
-                  startIcon={generating ? <CircularProgress size={20} /> : <RefreshIcon />}
-                >
-                  {generating ? 'Regenerating...' : 'Regenerate All Content'}
-                </Button>
-              </Box>
+      <Container maxWidth={viewMode === 'preview' ? 'lg' : 'md'} sx={{ flexGrow: 1, py: 4 }}>
+        
+        {/* EDITOR MODE */}
+        {viewMode === 'editor' && (
+          <Fade in={true}>
+            <Box>
+              <Paper sx={{ p: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">Topic</Typography>
+                    <Typography variant="body1">{project.topic}</Typography>
+                  </Box>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    startIcon={generating ? <CircularProgress size={20} color="inherit" /> : <MagicIcon />}
+                    onClick={handleGenerateContent}
+                    disabled={generating}
+                  >
+                    {hasContent ? 'Regenerate All' : 'Generate Content'}
+                  </Button>
+                </Box>
+              </Paper>
 
               {sortedItems.map((item, index) => {
                 const sectionId = item.id || (project.document_type === 'docx' ? `section_${item.order}` : `slide_${item.order}`);
                 const sectionContent = content[sectionId];
-                const hasSectionContent = sectionContent && sectionContent.content;
-
+                
                 return (
-                  <Accordion key={sectionId} defaultExpanded={index === 0} sx={{ mb: 2 }}>
+                  <Accordion key={index} defaultExpanded={index === 0} sx={{ mb: 2, '&:before': { display: 'none' }, borderRadius: '8px !important' }}>
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', mr: 2 }}>
-                        <Typography variant="h6" sx={{ flexGrow: 1 }}>
-                          {index + 1}. {item.title}
-                        </Typography>
-                        {hasSectionContent && (
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleFeedback(sectionId, 'like');
-                              }}
-                            >
-                              <ThumbUpIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleFeedback(sectionId, 'dislike');
-                              }}
-                            >
-                              <ThumbDownIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setCommentDialog({ open: true, sectionId });
-                              }}
-                            >
-                              <CommentIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        )}
-                      </Box>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{index + 1}. {item.title}</Typography>
                     </AccordionSummary>
                     <AccordionDetails>
-                      {hasSectionContent ? (
-                        <Box>
-                          <Paper sx={{ p: 2, mb: 2, bgcolor: 'grey.50' }}>
-                            <Typography variant="body1" style={{ whiteSpace: 'pre-wrap' }}>
-                              {sectionContent.content}
-                            </Typography>
-                          </Paper>
-
-                          <Box sx={{ mb: 2 }}>
+                      {sectionContent?.content ? (
+                        <>
+                          <TextField
+                            fullWidth multiline minRows={3} maxRows={10}
+                            value={sectionContent.content}
+                            InputProps={{ readOnly: true }}
+                            sx={{ bgcolor: '#f9fafb', mb: 2 }}
+                          />
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                             <TextField
-                              fullWidth
-                              multiline
-                              rows={2}
-                              label="Refinement Prompt"
-                              placeholder="e.g., Make this more formal, Convert to bullet points, Shorten to 100 words"
+                              fullWidth size="small"
+                              placeholder="AI Refinement Instruction (e.g. 'Make it more persuasive')"
                               value={refinementPrompts[sectionId] || ''}
-                              onChange={(e) =>
-                                setRefinementPrompts({
-                                  ...refinementPrompts,
-                                  [sectionId]: e.target.value,
-                                })
-                              }
-                              sx={{ mb: 1 }}
+                              onChange={(e) => setRefinementPrompts(prev => ({...prev, [sectionId]: e.target.value}))}
                             />
-                            <Button
-                              variant="contained"
-                              size="small"
+                            <Button 
+                              variant="outlined" 
                               onClick={() => handleRefine(sectionId)}
-                              disabled={refining[sectionId] || !refinementPrompts[sectionId]?.trim()}
+                              disabled={refining[sectionId] || !refinementPrompts[sectionId]}
                             >
-                              {refining[sectionId] ? (
-                                <CircularProgress size={20} />
-                              ) : (
-                                'Refine with AI'
-                              )}
+                              {refining[sectionId] ? <CircularProgress size={20} /> : 'Refine'}
                             </Button>
                           </Box>
-                        </Box>
+                          <Box sx={{ display: 'flex', mt: 1, justifyContent: 'flex-end', gap: 1 }}>
+                            <IconButton size="small" onClick={() => handleFeedback(sectionId, 'like')} color="primary"><ThumbUpIcon fontSize="small" /></IconButton>
+                            <IconButton size="small" onClick={() => handleFeedback(sectionId, 'dislike')}><ThumbDownIcon fontSize="small" /></IconButton>
+                          </Box>
+                        </>
                       ) : (
-                        <Typography color="text.secondary">
-                          Content not generated yet for this {project.document_type === 'docx' ? 'section' : 'slide'}
-                        </Typography>
+                        <Typography color="text.secondary" fontStyle="italic">Content pending generation...</Typography>
                       )}
                     </AccordionDetails>
                   </Accordion>
                 );
               })}
-            </>
-          )}
-        </Paper>
-      </Container>
+            </Box>
+          </Fade>
+        )}
 
-      <Dialog
-        open={commentDialog.open}
-        onClose={() => setCommentDialog({ open: false, sectionId: null })}
-      >
-        <DialogTitle>Add Comment</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Comment"
-            fullWidth
-            multiline
-            rows={4}
-            value={comments[commentDialog.sectionId] || ''}
-            onChange={(e) =>
-              setComments({
-                ...comments,
-                [commentDialog.sectionId]: e.target.value,
-              })
-            }
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCommentDialog({ open: false, sectionId: null })}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => handleAddComment(commentDialog.sectionId)}
-            variant="contained"
-          >
-            Add Comment
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </>
+        {/* PREVIEW MODE */}
+        {viewMode === 'preview' && (
+          <Fade in={true}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              {!hasContent ? (
+                <Box sx={{ textAlign: 'center', mt: 8 }}>
+                  <Typography variant="h5" color="text.secondary">No content generated yet.</Typography>
+                  <Button variant="outlined" sx={{ mt: 2 }} onClick={() => setViewMode('editor')}>Go to Editor to Generate</Button>
+                </Box>
+              ) : project.document_type === 'docx' ? (
+                // WORD PREVIEW (A4 Paper Style)
+                <Paper elevation={4} sx={{
+                  width: '210mm', minHeight: '297mm', p: '25mm',
+                  bgcolor: 'white', mb: 4, mx: 'auto'
+                }}>
+                  <Typography variant="h3" align="center" gutterBottom sx={{ fontFamily: 'Times New Roman', mb: 4 }}>
+                    {project.topic}
+                  </Typography>
+                  {sortedItems.map((item) => {
+                    const id = item.id || `section_${item.order}`;
+                    return (
+                      <Box key={id} sx={{ mb: 4 }}>
+                        <Typography variant="h5" sx={{ fontFamily: 'Times New Roman', fontWeight: 'bold', mb: 1 }}>
+                          {item.title}
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontFamily: 'Times New Roman', whiteSpace: 'pre-wrap', lineHeight: 1.6, textAlign: 'justify' }}>
+                          {content[id]?.content}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
+                </Paper>
+              ) : (
+                // POWERPOINT PREVIEW (Slide Deck Style)
+                <Box sx={{ width: '100%', maxWidth: '900px' }}>
+                  <Paper elevation={6} sx={{
+                    aspectRatio: '16/9', width: '100%', bgcolor: 'white',
+                    display: 'flex', flexDirection: 'column', p: 6, position: 'relative', overflow: 'hidden'
+                  }}>
+                    {sortedItems[currentSlideIndex] && (
+                      <>
+                        <Typography variant="h3" sx={{ color: '#2563eb', fontWeight: 'bold', mb: 4 }}>
+                          {sortedItems[currentSlideIndex].title}
+                        </Typography>
+                        <Box sx={{ width: '80px', height: '4px', bgcolor: '#fbbf24', mb: 4 }} />
+                        <Typography variant="h5" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                           {content[sortedItems[currentSlideIndex].id || `slide_${sortedItems[currentSlideIndex].order}`]?.content || "No content"}
+                        </Typography>
+                        <Typography sx={{ position: 'absolute', bottom: 20, right: 30, color: '#9ca3af' }}>
+                          {currentSlideIndex + 1} / {sortedItems.length}
+                        </Typography>
+                      </>
+                    )}
+                  </Paper>
+                  
+                  {/* Slide Navigation */}
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 2, gap: 2 }}>
+                    <IconButton 
+                      onClick={() => setCurrentSlideIndex(prev => Math.max(0, prev - 1))}
+                      disabled={currentSlideIndex === 0}
+                      sx={{ bgcolor: 'white', boxShadow: 1 }}
+                    >
+                      <PrevIcon />
+                    </IconButton>
+                    <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', maxWidth: '400px', p: 1 }}>
+                      {sortedItems.map((_, idx) => (
+                        <Box
+                          key={idx}
+                          onClick={() => setCurrentSlideIndex(idx)}
+                          sx={{
+                            width: 40, height: 25, bgcolor: idx === currentSlideIndex ? 'primary.main' : '#e5e7eb',
+                            cursor: 'pointer', borderRadius: 1
+                          }}
+                        />
+                      ))}
+                    </Box>
+                    <IconButton 
+                      onClick={() => setCurrentSlideIndex(prev => Math.min(sortedItems.length - 1, prev + 1))}
+                      disabled={currentSlideIndex === sortedItems.length - 1}
+                      sx={{ bgcolor: 'white', boxShadow: 1 }}
+                    >
+                      <NextIcon />
+                    </IconButton>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          </Fade>
+        )}
+      </Container>
+      
+      {/* Floating Action Button for Download (Always visible on mobile) */}
+      <Tooltip title="Download File">
+        <Fab 
+          color="primary" 
+          aria-label="download" 
+          sx={{ position: 'fixed', bottom: 32, right: 32, display: { md: 'none' } }}
+          onClick={handleExport}
+          disabled={!hasContent || exporting}
+        >
+           {exporting ? <CircularProgress size={24} color="inherit" /> : <DownloadIcon />}
+        </Fab>
+      </Tooltip>
+    </Box>
   );
 }
 
 export default ProjectDetail;
-
