@@ -34,6 +34,9 @@ class ProjectResponse(BaseModel):
     created_at: str
     updated_at: str
     user_id: str
+    # Include content and refinement history so FastAPI returns them in responses
+    content: Dict[str, Any] = {}
+    refinement_history: List[Dict[str, Any]] = []
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_project(
