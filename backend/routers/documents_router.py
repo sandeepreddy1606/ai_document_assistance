@@ -45,7 +45,7 @@ def generate_content_with_gemini(topic: str, section_title: str, document_type: 
         return f"This is placeholder content for {section_title}. Please configure GEMINI_API_KEY in your environment variables."
     
     try:
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         if document_type == "docx":
             prompt = f"""You are a professional document writer. Generate comprehensive content for a section titled "{section_title}" in a document about "{topic}".
@@ -83,7 +83,7 @@ def generate_template_with_gemini(topic: str, document_type: str) -> List[Dict[s
         return []
     
     try:
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         if document_type == "docx":
             prompt = f"""Generate a comprehensive outline for a document about "{topic}". 

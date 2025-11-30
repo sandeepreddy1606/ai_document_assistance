@@ -43,7 +43,7 @@ origins = [o.strip() for o in origins_raw.split(",") if o.strip()]
 # Allow a regex for localhost origins so the frontend dev server can run on any port
 # e.g. http://localhost:3000 or http://localhost:3001 etc. This is safe for local
 # development but you should lock this down for production.
-allow_origin_regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX", r"^https?:\/\/(localhost|127\.0\.0\.1)(:\\d+)?$")
+allow_origin_regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX", r"^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
