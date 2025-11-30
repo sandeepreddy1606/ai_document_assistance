@@ -10,4 +10,4 @@ passlib[bcrypt]>=1.7.4
 python-dotenv>=1.0.0
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
-
+beautifulsoup4>=4.12.0
