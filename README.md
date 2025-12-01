@@ -29,39 +29,6 @@ Quick highlights:
 - Fill `backend/.env` (Firebase credentials path, `GEMINI_API_KEY`, `CORS_ORIGINS`)
 - Fill `frontend/.env` with Firebase config and `REACT_APP_API_URL`
 
-## Workflow
-Below are screenshots demonstrating the main flows. Images are stored in `assets/`.
-
-**Authentication**
-
-![Sign Up](./assets/authentication/signup.png)
-![Sign In](./assets/authentication/signin.png)
-![Duplicate Sign Up](./assets/authentication/duplicate_signup.png)
-![Dashboard (after login)](./assets/authentication/dashboard.png)
-
-**Create & Edit Word Document (docx)**
-
-![Create Word Project](./assets/word/word project.png)
-![Word Editor](./assets/word/word_editor.png)
-![Word Editor (alt)](./assets/word/word_editor_1.png)
-![Word Topics / Templates](./assets/word/word_topics.png)
-![Word File Preview](./assets/word/word_file%20preview.png)
-![Word File Downloaded](./assets/word/word_file_downloded.png)
-![Word Creation](./assets/word/wrod_creation.png)
-
-**Create & Edit PowerPoint (pptx)**
-
-![Create PPTX Project](./assets/pptx/pptx_project.png)
-![PPTX Editor](./assets/pptx/pptx_editor.png)
-![Slides Generation](./assets/pptx/ppt_slides%20generation.png)
-![PPTX Preview](./assets/pptx/pptx_preview.png)
-![PPTX Downloaded](./assets/pptx/downloaded%20pptx.png)
-![PPTX Creation](./assets/pptx/pptx_creation.png)
-
-**Firestore / Backend**
-
-![Firebase Auth setup](./assets/firestore/firebase_authentication.png)
-![Firestore DB view](./assets/firestore/firestore_database.png)
 
 ## Minimal Notes
 - Backend: FastAPI + Firebase Admin + Gemini integration
@@ -457,25 +424,37 @@ For each section/slide:
 - Content generation uses context from previous sections for coherence
 - Document export uses python-docx and python-pptx libraries
 
-## Future Enhancements
 
-- Real-time collaboration
-- Version history and rollback
-- Multiple language support
-- Additional document formats (PDF, Markdown)
-- Template library
-- Advanced formatting options
-- Export customization
+## Workflow
+Below are screenshots demonstrating the main flows. Images are stored in `assets/`.
 
-## License
+**Authentication**
 
-This project is created for educational/assignment purposes.
+![Sign Up](./assets/authentication/signup.png)
+![Sign In](./assets/authentication/signin.png)
+![Duplicate Sign Up](./assets/authentication/duplicate_signup.png)
+![Dashboard (after login)](./assets/authentication/dashboard.png)
 
-## Support
+**Create & Edit Word Document (docx)**
 
-For issues or questions, please check:
-- FastAPI documentation: https://fastapi.tiangolo.com/
-- React documentation: https://react.dev/
-- Firebase documentation: https://firebase.google.com/docs
-- Gemini API documentation: https://ai.google.dev/docs
+![Create Word Project](./assets/word/word project.png)
+![Word Editor](./assets/word/word_editor.png)
+![Word Editor (alt)](./assets/word/word_editor_1.png)
+![Word Topics / Templates](./assets/word/word_topics.png)
+![Word File Preview](./assets/word/word_file%20preview.png)
+![Word File Downloaded](./assets/word/word_file_downloded.png)
+![Word Creation](./assets/word/wrod_creation.png)
 
+**Create & Edit PowerPoint (pptx)**
+
+![Create PPTX Project](./assets/pptx/pptx_project.png)
+![PPTX Editor](./assets/pptx/pptx_editor.png)
+![Slides Generation](./assets/pptx/ppt_slides%20generation.png)
+![PPTX Preview](./assets/pptx/pptx_preview.png)
+![PPTX Downloaded](./assets/pptx/downloaded%20pptx.png)
+![PPTX Creation](./assets/pptx/pptx_creation.png)
+
+**Firestore / Backend**
+
+![Firebase Auth setup](./assets/firestore/firebase_authentication.png)
+![Firestore DB view](./assets/firestore/firestore_database.png)
