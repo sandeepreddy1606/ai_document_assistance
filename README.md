@@ -1,3 +1,79 @@
+# AI Document Assistant
+
+Simple AI-assisted web app to generate, refine and export Word (.docx) or PowerPoint (.pptx) documents.
+
+Quick highlights:
+- Authenticated users (Firebase)
+- Generate sections or slides with Google Gemini
+- Refine content per-section and export final files
+
+## Quick Start
+
+1. Backend
+   ```powershell
+   cd backend
+   python -m venv .venv
+   .\.venv\Scripts\activate
+   pip install -r requirements.txt
+   uvicorn main:app --reload --host 0.0.0.0 --port 8000
+   ```
+
+2. Frontend
+   ```powershell
+   cd frontend
+   npm install
+   npm start
+   ```
+
+3. Environment
+- Fill `backend/.env` (Firebase credentials path, `GEMINI_API_KEY`, `CORS_ORIGINS`)
+- Fill `frontend/.env` with Firebase config and `REACT_APP_API_URL`
+
+## Workflow
+Below are screenshots demonstrating the main flows. Images are stored in `assets/`.
+
+**Authentication**
+
+![Sign Up](./assets/authentication/signup.png)
+![Sign In](./assets/authentication/signin.png)
+![Duplicate Sign Up](./assets/authentication/duplicate_signup.png)
+![Dashboard (after login)](./assets/authentication/dashboard.png)
+
+**Create & Edit Word Document (docx)**
+
+![Create Word Project](./assets/word/word project.png)
+![Word Editor](./assets/word/word_editor.png)
+![Word Editor (alt)](./assets/word/word_editor_1.png)
+![Word Topics / Templates](./assets/word/word_topics.png)
+![Word File Preview](./assets/word/word_file%20preview.png)
+![Word File Downloaded](./assets/word/word_file_downloded.png)
+![Word Creation](./assets/word/wrod_creation.png)
+
+**Create & Edit PowerPoint (pptx)**
+
+![Create PPTX Project](./assets/pptx/pptx_project.png)
+![PPTX Editor](./assets/pptx/pptx_editor.png)
+![Slides Generation](./assets/pptx/ppt_slides%20generation.png)
+![PPTX Preview](./assets/pptx/pptx_preview.png)
+![PPTX Downloaded](./assets/pptx/downloaded%20pptx.png)
+![PPTX Creation](./assets/pptx/pptx_creation.png)
+
+**Firestore / Backend**
+
+![Firebase Auth setup](./assets/firestore/firebase_authentication.png)
+![Firestore DB view](./assets/firestore/firestore_database.png)
+
+## Minimal Notes
+- Backend: FastAPI + Firebase Admin + Gemini integration
+- Frontend: React + MUI, uses `REACT_APP_API_URL` to call backend
+- Data: Firestore stores projects, content and refinement history
+
+## Troubleshooting (quick)
+- If frontend shows network/CORS errors, add `http://localhost:3000` to `CORS_ORIGINS` in backend `.env`.
+- If Firebase credentials missing, place the service-account JSON in `backend` and set `FIREBASE_CREDENTIALS_PATH`.
+
+---
+If you want this README expanded or tailored (developer notes, API reference, or smaller image thumbnails), tell me which sections to keep or remove.
 # AI-Assisted Document Authoring and Generation Platform
 
 A full-stack, AI-powered web application that allows authenticated users to generate, refine, and export structured business documents (Word .docx or PowerPoint .pptx) using Google's Gemini API.

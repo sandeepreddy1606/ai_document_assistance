@@ -101,17 +101,3 @@ service cloud.firestore {
 
 Click "Publish" to save the rules.
 
-## Quick Checklist
-
-- [ ] Firebase project created
-- [ ] Authentication enabled (Email/Password)
-- [ ] Firestore Database created
-- [ ] Service account key downloaded as `backend/firebase-credentials.json`
-- [ ] Firebase web app config copied
-- [ ] Gemini API key obtained
-- [ ] Backend `.env` file created with correct values
-- [ ] Frontend `.env` file created with Firebase config
-- [ ] Firestore security rules updated
-
-Once all these are done, you can run the project!
-
